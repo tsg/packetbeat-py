@@ -51,6 +51,21 @@ class PacketbeatMiddleware(object):
 
         return output
 
+    def headers_to_dict(self, headers_tuples):
+        """process_headers(headers_tuples) -> headers_dict
+
+        Transform a list of (header_name, header_value) tuples
+        in a dictionary. If the same header_name shows more than
+        once, the values are coma separated.
+        """
+        output = {}
+        for name, value in headers_tuples:
+            if name in output:
+                output[name] += ", " + value
+            else:
+                output[name] = value
+        return output
+
     def __call__(self, environ, start_response):
         trans = {
             "type": "http",
@@ -60,6 +75,7 @@ class PacketbeatMiddleware(object):
             "port": environ.get("SERVER_PORT"),
             "client_port": environ.get("REMOTE_PORT"),
             "client_ip": environ.get("REMOTE_ADDR"),
+            "notes": ""
         }
 
         def start_response_wrapper(status, response_headers):
@@ -71,8 +87,14 @@ class PacketbeatMiddleware(object):
         start_time = time.time()
         res = self.app(environ, start_response_wrapper)
 
-        trans["status"] = start_response_wrapper.status
-        trans["http.response_headers"] = start_response_wrapper.headers
+        try:
+            status_obj = start_response_wrapper.status
+            trans.update(status_obj)
+        except:
+            trans["notes"] += "Error parsing status field. "
+
+        trans["http.response_headers"] = self.headers_to_dict(
+            start_response_wrapper.headers)
 
         # precision in milliseconds
         trans["responsetime"] = int((time.time() - start_time) * 1e6)
