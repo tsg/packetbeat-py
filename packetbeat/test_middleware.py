@@ -64,7 +64,7 @@ class TestMiddleware(unittest.TestCase):
             assert obj["port"] == 8080
             assert obj["client_port"] == 45321
             assert obj["client_ip"] == "127.0.0.1"
-            assert obj["http.response_headers"]["Content-Type"] == "json"
+            assert obj["http"]["response_headers"]["Content-Type"] == "json"
             assert "responsetime" in obj
 
         finally:
@@ -81,29 +81,37 @@ class TestMiddleware(unittest.TestCase):
             "input": "200 OK",
             "output": {
                 "status": "OK",
-                "http.code": 200,
-                "http.phrase": "OK"
+                "http": {
+                    "code": 200,
+                    "phrase": "OK"
+                }
             }
         }, {
             "input": "404 User not found",
             "output": {
                 "status": "Client Error",
-                "http.code": 404,
-                "http.phrase": "User not found"
+                "http": {
+                    "code": 404,
+                    "phrase": "User not found"
+                }
             }
         }, {
             "input": "503 Try again later",
             "output": {
                 "status": "Server Error",
-                "http.code": 503,
-                "http.phrase": "Try again later"
+                "http": {
+                    "code": 503,
+                    "phrase": "Try again later"
+                }
             }
         }, {
             "input": "500",
             "output": {
                 "status": "Server Error",
-                "http.code": 500,
-                "http.phrase": ""
+                "http": {
+                    "code": 500,
+                    "phrase": ""
+                }
             }
         }]
 
@@ -111,8 +119,7 @@ class TestMiddleware(unittest.TestCase):
             res = mw.decode_status_line(test["input"])
             print("result: ", res)
             print("expected: ", test["output"])
-            for key, val in test["output"].items():
-                assert res[key] == val
+            self.assertEqual(res, test["output"])
 
     def test_decode_status_line_negative(self):
         """

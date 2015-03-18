@@ -43,11 +43,12 @@ class PacketbeatMiddleware(object):
         else:
             output["status"] = "Error"
 
-        output["http.code"] = code
+        output["http"] = {}
+        output["http"]["code"] = code
         if len(split) > 1:
-            output["http.phrase"] = split[1]
+            output["http"]["phrase"] = split[1]
         else:
-            output["http.phrase"] = ""
+            output["http"]["phrase"] = ""
 
         return output
 
@@ -88,12 +89,14 @@ class PacketbeatMiddleware(object):
         res = self.app(environ, start_response_wrapper)
 
         try:
-            status_obj = start_response_wrapper.status
+            status_obj = self.decode_status_line(start_response_wrapper.status)
             trans.update(status_obj)
         except:
             trans["notes"] += "Error parsing status field. "
 
-        trans["http.response_headers"] = self.headers_to_dict(
+        if "http" not in trans:
+            trans["http"] = {}
+        trans["http"]["response_headers"] = self.headers_to_dict(
             start_response_wrapper.headers)
 
         # precision in milliseconds
