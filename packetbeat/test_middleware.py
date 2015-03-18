@@ -18,6 +18,10 @@ class WsgiTestApp(object):
 class TestMiddleware(unittest.TestCase):
 
     def test_middlewares(self):
+        """
+        Extract simple transaction and write it in a file
+        as a json.
+        """
         tempf = tempfile.NamedTemporaryFile(delete=False)
         tempf.close()
         try:
@@ -52,11 +56,75 @@ class TestMiddleware(unittest.TestCase):
                     objs.append(json.loads(line))
 
             assert len(objs) == 1
-            assert objs[0]["method"] == "GET"
-            assert objs[0]["path"] == "/users"
-            assert objs[0]["port"] == 8080
-            assert objs[0]["client_port"] == 45321
-            assert objs[0]["client_ip"] == "127.0.0.1"
+            obj = objs[0]
+            assert obj["method"] == "GET"
+            assert obj["path"] == "/users"
+            assert obj["port"] == 8080
+            assert obj["client_port"] == 45321
+            assert obj["client_ip"] == "127.0.0.1"
+            assert "responsetime" in obj
 
         finally:
             os.unlink(tempf.name)
+
+    def test_decode_status_line(self):
+        """
+        Should work to split the status line in the
+        code, phrase and high level status.
+        """
+        mw = PacketbeatMiddleware(None, None)
+
+        tests = [{
+            "input": "200 OK",
+            "output": {
+                "status": "OK",
+                "http.code": 200,
+                "http.phrase": "OK"
+            }
+        }, {
+            "input": "404 User not found",
+            "output": {
+                "status": "Client Error",
+                "http.code": 404,
+                "http.phrase": "User not found"
+            }
+        }, {
+            "input": "503 Try again later",
+            "output": {
+                "status": "Server Error",
+                "http.code": 503,
+                "http.phrase": "Try again later"
+            }
+        }, {
+            "input": "500",
+            "output": {
+                "status": "Server Error",
+                "http.code": 500,
+                "http.phrase": ""
+            }
+        }]
+
+        for test in tests:
+            res = mw.decode_status_line(test["input"])
+            print("result: ", res)
+            print("expected: ", test["output"])
+            for key, val in test["output"].items():
+                assert res[key] == val
+
+    def test_decode_status_line_negative(self):
+        """
+        Should raise exception when the status line
+        cannot be parsed.
+        """
+        mw = PacketbeatMiddleware(None, None)
+
+        tests = [
+            "12a Bad status code",
+            "No status code",
+            "   500 Spaces before code are invalid",
+            "200\tTab separator is invalid",
+        ]
+
+        for test in tests:
+            self.assertRaises(ValueError,
+                              lambda: mw.decode_status_line(test))
